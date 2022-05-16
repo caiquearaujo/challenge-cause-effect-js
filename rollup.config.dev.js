@@ -6,9 +6,9 @@ import autoprefixer from 'autoprefixer';
 
 module.exports = [
 	{
-		input: 'src/ts/index.ts',
+		input: 'src/main.ts',
 		output: {
-			file: 'dev/dist/cause-effect.js',
+			file: 'public/dist/cause-effect.js',
 			name: 'cause-effect',
 			format: 'umd',
 		},
@@ -16,7 +16,7 @@ module.exports = [
 			resolve(),
 			typescript(),
 			scss({
-				output: 'dev/dist/styles.css',
+				output: 'public/dist/styles.css',
 				processor: () => postcss([autoprefixer()]),
 				outputStyle: 'compressed',
 			}),
