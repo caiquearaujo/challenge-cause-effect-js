@@ -1,9 +1,6 @@
 import uglify from '@lopatnov/rollup-plugin-uglify';
 import resolve from '@rollup/plugin-node-resolve';
 import typescript from '@rollup/plugin-typescript';
-import scss from 'rollup-plugin-scss';
-import postcss from 'postcss';
-import autoprefixer from 'autoprefixer';
 
 module.exports = [
 	{
@@ -13,15 +10,7 @@ module.exports = [
 			name: 'cause-effect',
 			format: 'umd',
 		},
-		plugins: [
-			resolve(),
-			typescript(),
-			scss({
-				output: '/styles.css',
-				processor: () => postcss([autoprefixer()]),
-				outputStyle: 'compressed',
-			}),
-		],
+		plugins: [resolve(), typescript()],
 	},
 	{
 		input: 'src/main.ts',

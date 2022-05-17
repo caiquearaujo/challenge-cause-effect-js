@@ -1,58 +1,57 @@
 import Entry from '@/sample/people';
+import './styles/app.scss';
 
 type TUser = {
 	id: number;
+	avatar: string;
 	name: string;
 	street: string;
 	city: string;
-	state?: string;
+	state: string;
 	country: string;
-	telephone: string;
+	phone: string;
 };
 
 class ListPanel {
-	private _users;
 	private _onClick;
 
-	constructor(
-		users: Array<Pick<TUser, 'id' | 'name'>>,
-		onClick: (id: number) => void
-	) {
-		this._users = users;
-		this._onClick = onClick;
-
-		this.create();
+	constructor(handlerUserClick: (el: HTMLElement, id: number) => void) {
+		this._onClick = handlerUserClick;
 		this.bind();
-	}
-
-	public create() {
-		const wrapper = document.createElement('section');
-		wrapper.className = 'list-panel';
-
-		const ul = document.createElement('ul');
-
-		this._users.forEach((u, idx) => {
-			const user = document.createElement('li');
-
-			user.className = 'user';
-			user.id = `user-item-${u.id}`;
-			user.textContent = u.name;
-
-			user.setAttribute('data-user-index', idx.toString());
-
-			ul.appendChild(user);
-		});
-
-		wrapper.appendChild(ul);
-		document.getElementById('root')?.appendChild(wrapper);
 	}
 
 	public bind() {
 		document.addEventListener('click', (e: any) => {
-			if (!e.target.hasAttribute('data-user-index')) return;
+			const parent = e.target.closest('.user');
 
-			this._onClick(parseInt(e.target.getAttribute('data-user-index')));
+			if (parent) {
+				const id = parseInt(parent.getAttribute('data-id'));
+
+				this._onClick(parent, id);
+			}
 		});
+	}
+
+	public render(users: Array<Pick<TUser, 'id' | 'name' | 'avatar'>>) {
+		if (users.length === 0) return;
+
+		const list = document.getElementById('user-list');
+
+		if (!list) throw new Error('User list wrapper is not found on page.');
+
+		list.innerHTML += users
+			.map(user => {
+				return `
+			<li class="user" data-id="${user.id}" data-name="${user.name}">
+				<img src="/avatars/${user.avatar}"/>
+				<span>${user.name}</span>
+			</li>`;
+			})
+			.join('');
+	}
+
+	public static template(): string {
+		return `<section class="list-panel"><ul id="user-list"></ul></section>`;
 	}
 }
 
@@ -61,11 +60,12 @@ class InfoPanel {
 	private _wrapper: HTMLElement;
 
 	constructor() {
-		const wrapper = document.createElement('section');
-		wrapper.className = 'info-panel';
+		const wrapper = document.getElementById('user-info');
+
+		if (!wrapper)
+			throw new Error('User info wrapper is not found on page.');
 
 		this._wrapper = wrapper;
-		document.getElementById('root')?.appendChild(wrapper);
 	}
 
 	public changeUser(user: TUser) {
@@ -82,57 +82,103 @@ class InfoPanel {
 	public render() {
 		if (!this._user) return;
 
-		Object.keys(this._user).forEach(k => {
-			const wrapper = document.createElement('div');
-			wrapper.className = 'column';
+		let html = `
+			<div class="row header">
+				<img src="/avatars/${this._user.avatar}" />
+				${this._createColumn('name', this._user.name)}
+			</div>
+			<div class="row">
+		`;
 
-			const label = document.createElement('span');
-			label.className = 'label';
-			label.textContent = k;
-
-			const value = document.createElement('span');
-			value.className = 'value';
+		['street', 'city', 'state', 'country', 'phone'].forEach(k => {
 			// @ts-ignore
-			value.textContent = `${this._user[k]}`;
-
-			wrapper.appendChild(label);
-			wrapper.appendChild(value);
-
-			this._wrapper.appendChild(wrapper);
+			html += this._createColumn(k, this._user[k]);
 		});
+
+		html += `</div>`;
+		this._wrapper.innerHTML = html;
 	}
 
 	public flush() {
 		this._wrapper.replaceChildren();
 	}
+
+	private _createColumn(k: string, v: string): string {
+		return `
+			<div class="column ${k}">
+				<span class="label">${k}</span>
+				<span class="value">${v}</span>
+			</div>
+		`;
+	}
+
+	public static template(): string {
+		return `<section id="user-info" class="info-panel"></section>`;
+	}
 }
 
 class App {
-	private _currentUser: number | null = null;
-	private _infoPanel;
+	private _id: string;
+	private _users: Array<TUser>;
+	private _curr: { el: HTMLElement; id: number } | null = null;
 
-	constructor() {
-		const root = document.createElement('div');
-		root.id = 'root';
+	private _list;
+	private _info;
 
-		document.querySelector('body')?.appendChild(root);
+	constructor(id: string) {
+		this._id = id;
+		this._users = [];
 
-		new ListPanel(Entry, this.onClick.bind(this));
-		this._infoPanel = new InfoPanel();
+		this.create();
+
+		this._list = new ListPanel(this.onUserClick.bind(this));
+		this._info = new InfoPanel();
 	}
 
-	public onClick(id: number) {
-		if (!Entry[id]) return;
+	public create(): void {
+		const root = document.getElementById(this._id);
 
-		if (id === this._currentUser) {
-			this._infoPanel.clearUser();
-			this._currentUser = null;
+		if (!root)
+			throw new Error(
+				`Application wrapper id as '${this._id}' not found...`
+			);
+
+		root.innerHTML = `${ListPanel.template()}${InfoPanel.template()}`;
+	}
+
+	public load(users: Array<TUser>): void {
+		if (users.length === 0) return;
+
+		this._users = this._users.concat(users);
+		this._list.render(users);
+	}
+
+	public find(id: number): TUser | undefined {
+		return this._users.find(u => u.id === id);
+	}
+
+	public onUserClick(el: HTMLElement, id: number) {
+		const user = this.find(id);
+
+		if (!user) return;
+
+		if (this._curr && id === this._curr.id) {
+			this._curr.el.classList.remove('selected');
+
+			this._info.clearUser();
+			this._curr = null;
 			return;
+		} else if (this._curr) {
+			this._curr.el.classList.remove('selected');
 		}
 
-		this._currentUser = id;
-		this._infoPanel.changeUser(Entry[id]);
+		el.classList.add('selected');
+		this._curr = { id, el };
+		this._info.changeUser(user);
 	}
 }
 
-document.addEventListener('DOMContentLoaded', () => new App());
+document.addEventListener('DOMContentLoaded', () => {
+	const app = new App('root');
+	app.load(Entry);
+});
