@@ -1,7 +1,6 @@
 import Entry from '@/sample/people';
-import './styles/app.scss';
 
-type TUser = {
+export type TUser = {
 	id: number;
 	avatar: string;
 	name: string;
@@ -12,34 +11,39 @@ type TUser = {
 	phone: string;
 };
 
-class ListPanel {
-	private _onClick;
+export class ListPanel {
+	private _onClick: (el: Element, id: number) => void;
+	private _wrapper: HTMLElement;
 
-	constructor(handlerUserClick: (el: HTMLElement, id: number) => void) {
-		this._onClick = handlerUserClick;
+	constructor(handler: (el: Element, id: number) => void) {
+		const wrapper = document.getElementById('user-list');
+
+		if (!wrapper) throw new Error('User info wrapper must be on DOM.');
+		this._wrapper = wrapper;
+
+		this._onClick = handler;
 		this.bind();
 	}
 
 	public bind() {
 		document.addEventListener('click', (e: any) => {
-			const parent = e.target.closest('.user');
-
-			if (parent) {
-				const id = parseInt(parent.getAttribute('data-id'));
-
-				this._onClick(parent, id);
-			}
+			this.click(e.target);
 		});
+	}
+
+	public click(el: Element) {
+		const parent = el.closest('.user');
+
+		if (parent) {
+			const id = parseInt(parent.getAttribute('data-id') ?? '0');
+			this._onClick(parent, id);
+		}
 	}
 
 	public render(users: Array<Pick<TUser, 'id' | 'name' | 'avatar'>>) {
 		if (users.length === 0) return;
 
-		const list = document.getElementById('user-list');
-
-		if (!list) throw new Error('User list wrapper is not found on page.');
-
-		list.innerHTML += users
+		this._wrapper.innerHTML += users
 			.map(user => {
 				return `
 			<li class="user" data-id="${user.id}" data-name="${user.name}">
@@ -50,21 +54,22 @@ class ListPanel {
 			.join('');
 	}
 
+	public wrapper(): HTMLElement {
+		return this._wrapper;
+	}
+
 	public static template(): string {
 		return `<section class="list-panel"><ul id="user-list"></ul></section>`;
 	}
 }
 
-class InfoPanel {
+export class InfoPanel {
 	private _user?: TUser;
 	private _wrapper: HTMLElement;
 
 	constructor() {
 		const wrapper = document.getElementById('user-info');
-
-		if (!wrapper)
-			throw new Error('User info wrapper is not found on page.');
-
+		if (!wrapper) throw new Error('User info wrapper must be on DOM.');
 		this._wrapper = wrapper;
 	}
 
@@ -112,15 +117,21 @@ class InfoPanel {
 		`;
 	}
 
+	public wrapper(): HTMLElement {
+		return this._wrapper;
+	}
+
 	public static template(): string {
 		return `<section id="user-info" class="info-panel"></section>`;
 	}
 }
 
-class App {
+export class App {
+	private _rendered: boolean = false;
+
 	private _id: string;
 	private _users: Array<TUser>;
-	private _curr: { el: HTMLElement; id: number } | null = null;
+	private _curr: { el: Element; id: number } | null = null;
 
 	private _list;
 	private _info;
@@ -129,21 +140,10 @@ class App {
 		this._id = id;
 		this._users = [];
 
-		this.create();
+		this._create();
 
 		this._list = new ListPanel(this.onUserClick.bind(this));
 		this._info = new InfoPanel();
-	}
-
-	public create(): void {
-		const root = document.getElementById(this._id);
-
-		if (!root)
-			throw new Error(
-				`Application wrapper id as '${this._id}' not found...`
-			);
-
-		root.innerHTML = `${ListPanel.template()}${InfoPanel.template()}`;
 	}
 
 	public load(users: Array<TUser>): void {
@@ -157,28 +157,50 @@ class App {
 		return this._users.find(u => u.id === id);
 	}
 
-	public onUserClick(el: HTMLElement, id: number) {
+	public onUserClick(el: Element, id: number) {
 		const user = this.find(id);
 
 		if (!user) return;
 
-		if (this._curr && id === this._curr.id) {
+		if (this._curr) {
 			this._curr.el.classList.remove('selected');
 
-			this._info.clearUser();
-			this._curr = null;
-			return;
-		} else if (this._curr) {
-			this._curr.el.classList.remove('selected');
+			if (id === this._curr.id) {
+				this._info.clearUser();
+				this._curr = null;
+
+				return;
+			}
 		}
 
 		el.classList.add('selected');
 		this._curr = { id, el };
 		this._info.changeUser(user);
 	}
+
+	public getCurrent() {
+		return this._curr;
+	}
+
+	public isOnDOM() {
+		return this._rendered;
+	}
+
+	private _create(): void {
+		const root = document.getElementById(this._id);
+
+		if (!root)
+			throw new Error(
+				`Application wrapper id as '${this._id}' not found...`
+			);
+
+		root.innerHTML = `${ListPanel.template()}${InfoPanel.template()}`;
+		this._rendered = true;
+	}
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-	const app = new App('root');
-	app.load(Entry);
-});
+export const start = () =>
+	document.addEventListener('DOMContentLoaded', () => {
+		const app = new App('root');
+		app.load(Entry);
+	});

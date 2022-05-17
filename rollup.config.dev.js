@@ -9,7 +9,7 @@ module.exports = [
 		input: 'src/main.ts',
 		output: {
 			file: 'public/dist/cause-effect.js',
-			name: 'cause-effect',
+			name: 'causeEffect',
 			format: 'umd',
 		},
 		plugins: [
